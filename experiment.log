@@ -1,0 +1,14 @@
+2025-05-21 14:29:20,676 Generated layer profile with 1 layers:
+2025-05-21 14:29:20,676 ['(\'cx\', (<Qubit register=(2, "q"), index=0>, <Qubit register=(2, "q"), index=1>))']
+2025-05-21 14:29:20,678 Created pauli bases
+2025-05-21 14:29:20,678 ['XX', 'YX', 'ZX', 'XY', 'YY', 'ZY', 'XZ', 'YZ', 'ZZ']
+2025-05-21 14:29:20,678 Created model with the following terms:
+2025-05-21 14:29:20,678 {'YX', 'XX', 'XZ', 'IX', 'YZ', 'ZI', 'XI', 'YI', 'IZ', 'ZX', 'YY', 'IY', 'ZY', 'ZZ', 'XY'}
+2025-05-21 14:29:28,890 Chose single bases:
+2025-05-21 14:29:28,892 ['XY', 'ZY', 'YY', 'XX', 'ZI', 'YI']
+2025-05-21 14:30:15,888 Created experiment consisting of 1464 instances
+2025-05-21 14:30:47,931 Single-depth measurement produced fidelity greater than one: YI,YZ
+2025-05-21 14:30:47,931 Product fidelity: 0.9956054778137883
+2025-05-21 14:30:47,931 Single fidelity: 0.9889714913058271
+2025-05-21 14:30:47,931 Fit noise model with following fidelities:
+2025-05-21 14:30:47,931 [np.float64(0.9972977083941069), np.float64(0.9951713182633325), np.float64(0.9887693037533607), np.float64(0.9999705753907103), np.float64(0.9901368549320061), np.float64(0.996772338961059), np.float64(0.996944128427945), np.float64(0.9912302674528216), np.float64(0.9956586897390096), np.float64(0.9996960699879238), np.float64(0.9948405972278079), np.float64(0.9967480514307403), np.float64(0.9955315013301692), np.float64(0.9972998453762721), np.float64(0.9984173256625165)]

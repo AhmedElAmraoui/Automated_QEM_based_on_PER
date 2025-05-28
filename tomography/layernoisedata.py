@@ -10,6 +10,7 @@ from tomography.benchmarkinstance import BenchmarkInstance, SINGLE, PAIR
 
 import logging
 from itertools import cycle
+from qiskit.quantum_info import Pauli
 
 logger = logging.getLogger("experiment")
 
@@ -153,10 +154,16 @@ class LayerNoiseData:
                 coeffs = [coeffs_dict[term] for term in group]
                 ax.bar([term.to_label() for term in group], coeffs, color=c)
         elif plot_style == 2:
-            model_terms = list(self._term_data.keys())
+            model_terms_x = list(self.layer._procspec.model_terms)
+            model_terms = []
+            for term in model_terms_x:
+                model_terms.append(str(term))
             coeffs_dict = dict(self.noisemodel.coeffs)
+            coeffs = {
+            term.to_label(): value
+            for term, value in self.noisemodel.coeffs}
             coupling_list = self.layer._procspec._processor.sub_map(self.layer._procspec.inst_map)
-            self.plot_grouped_by_qubit(model_terms, coeffs_dict, coupling_list, title="Fidelity", ylabel= "Coefficients")
+            self.plot_grouped_by_qubit(model_terms, coeffs, coupling_list, title="Fidelity", ylabel= "Coefficients")
 
     def graph(self, *links):
         """Graph the fits values for a certain subset of Pauli terms"""
@@ -182,30 +189,33 @@ class LayerNoiseData:
                 ax.bar([term.to_label() for term in group], infidelities, color=c)
             return ax
         elif plot_style == 2:
-            model_terms = list(self._term_data.keys())
+            model_terms_x = list(self.layer._procspec.model_terms)
+            model_terms = []
+            for term in model_terms_x:
+                model_terms.append(str(term))
             infidelities = {}
             for term in model_terms:
-                infidelities[term] = 1-self._term_data[term].fidelity
+                infidelities[term] = 1-self._term_data[Pauli(term)].fidelity
             
             coupling_list = self.layer._procspec._processor.sub_map(self.layer._procspec.inst_map)
-            self.plot_grouped_by_qubit(model_terms, infidelities, coupling_list, title="Fidelity", ylabel= "Coefficients")
+            self.plot_grouped_by_qubit(model_terms, infidelities, coupling_list)
             
             
-    def plot_grouped_by_qubit(model_terms, coeffs, coupling_list, title="Fidelity", ylabel= "Coefficients"):
+    def plot_grouped_by_qubit(self, model_terms, coeffs, coupling_list, title="Fidelity", ylabel= "Coefficients"):
         """
         Plots measured vs ideal fidelities grouped by qubit or qubit pair,
         sorted alphabetically within groups, with clean Pauli labels and separators.
         """
-        n_qubits = len(model_terms[0].to_label())
-        allowed_pairs = {(min(a, b), max(a, b)) for (a, b) in coupling_list}
+        n_qubits = len(str(model_terms[1]))
+        allowed_pairs = {(min(a, b), max(a, b)) for (a, b) in coupling_list.edge_list()}
 
         block_colors = ['#d0e1f9', '#f9d0d0', '#d0f9d9', '#f9f5d0', '#e0d0f9', '#f0c0f9']
 
         def pauli_support(pauli):
-            return [i for i, p in enumerate(pauli.to_label()) if p != 'I']
+            return [i for i, p in enumerate(pauli) if p != 'I']
 
         def compact_pauli_label(pauli):
-            return ''.join(p for p in pauli.to_label() if p != 'I')
+            return ''.join(p for p in pauli if p != 'I')
 
         def pauli_key_string(pauli):
             return compact_pauli_label(pauli)
@@ -254,15 +264,14 @@ class LayerNoiseData:
             for idx in sorted_indices:
                 bar_positions.append(current_index)
                 bar_labels.append(compact_pauli_label(model_terms[idx]))
-                bar_measured.append(coeffs[idx])
+                bar_measured.append(coeffs[model_terms[idx]])
                 current_index += 1
 
             separator_lines.append(current_index - 0.5)
 
         # Balken plotten
         bar_positions = np.array(bar_positions)
-        ax.bar(bar_positions + 0.2, bar_measured, 0.4, color='tab:blue', label='Measured')
-        ax.bar(bar_positions - 0.2, bar_ideal, 0.4, color='tab:green', label='Ideal')
+        ax.bar(bar_positions, bar_measured, 0.4, color='tab:blue', label='Measured')
         
         from matplotlib.patches import Rectangle
         

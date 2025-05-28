@@ -139,18 +139,24 @@ class LayerNoiseData:
 
         return dict(zip(self._term_data.keys(), [termdata.spam for termdata in self._term_data.values()]))
 
-    def plot_coeffs(self, *links):
+    def plot_coeffs(self, *links, plot_style = 1):
         """Plot the model coefficients in the generator of the sparse model corresponding
         to the current circuit layer"""
-
-        coeffs_dict = dict(self.noisemodel.coeffs)
-        groups = self._model_terms(links)
-        fig, ax = plt.subplots()
-        colcy = cycle(COLORS)
-        for group in groups:
-            c = next(colcy)
-            coeffs = [coeffs_dict[term] for term in group]
-            ax.bar([term.to_label() for term in group], coeffs, color=c)
+        
+        if plot_style == 1:
+            coeffs_dict = dict(self.noisemodel.coeffs)
+            groups = self._model_terms(links)
+            fig, ax = plt.subplots()
+            colcy = cycle(COLORS)
+            for group in groups:
+                c = next(colcy)
+                coeffs = [coeffs_dict[term] for term in group]
+                ax.bar([term.to_label() for term in group], coeffs, color=c)
+        elif plot_style == 2:
+            model_terms = list(self._term_data.keys())
+            coeffs_dict = dict(self.noisemodel.coeffs)
+            coupling_list = self.layer._procspec._processor.sub_map(self.layer._procspec.inst_map)
+            self.plot_grouped_by_qubit(model_terms, coeffs_dict, coupling_list, title="Fidelity", ylabel= "Coefficients")
 
     def graph(self, *links):
         """Graph the fits values for a certain subset of Pauli terms"""
@@ -164,14 +170,121 @@ class LayerNoiseData:
 
         return ax
 
-    def plot_infidelitites(self, *links):
+    def plot_infidelitites(self, *links, plot_style = 1):
         """Plot the infidelities of a subset of Pauli terms"""
+        if plot_style == 1:
+            groups = self._model_terms(links)
+            fig, ax = plt.subplots()
+            colcy = cycle(COLORS)
+            for group in groups:
+                c = next(colcy)
+                infidelities = [1-self._term_data[term].fidelity for term in group]
+                ax.bar([term.to_label() for term in group], infidelities, color=c)
+            return ax
+        elif plot_style == 2:
+            model_terms = list(self._term_data.keys())
+            infidelities = {}
+            for term in model_terms:
+                infidelities[term] = 1-self._term_data[term].fidelity
+            
+            coupling_list = self.layer._procspec._processor.sub_map(self.layer._procspec.inst_map)
+            self.plot_grouped_by_qubit(model_terms, infidelities, coupling_list, title="Fidelity", ylabel= "Coefficients")
+            
+            
+    def plot_grouped_by_qubit(model_terms, coeffs, coupling_list, title="Fidelity", ylabel= "Coefficients"):
+        """
+        Plots measured vs ideal fidelities grouped by qubit or qubit pair,
+        sorted alphabetically within groups, with clean Pauli labels and separators.
+        """
+        n_qubits = len(model_terms[0].to_label())
+        allowed_pairs = {(min(a, b), max(a, b)) for (a, b) in coupling_list}
 
-        groups = self._model_terms(links)
-        fig, ax = plt.subplots()
-        colcy = cycle(COLORS)
-        for group in groups:
-            c = next(colcy)
-            infidelities = [1-self._term_data[term].fidelity for term in group]
-            ax.bar([term.to_label() for term in group], infidelities, color=c)
-        return ax
+        block_colors = ['#d0e1f9', '#f9d0d0', '#d0f9d9', '#f9f5d0', '#e0d0f9', '#f0c0f9']
+
+        def pauli_support(pauli):
+            return [i for i, p in enumerate(pauli.to_label()) if p != 'I']
+
+        def compact_pauli_label(pauli):
+            return ''.join(p for p in pauli.to_label() if p != 'I')
+
+        def pauli_key_string(pauli):
+            return compact_pauli_label(pauli)
+
+        # Gruppieren nach Gewicht und beteiligten Qubits
+        groups = {}
+        for i, term in enumerate(model_terms):
+            support = pauli_support(term)
+            weight = len(support)
+            if weight == 1:
+                key = (1, support[0])
+            elif weight == 2:
+                pair = tuple(sorted(support))
+                if pair not in allowed_pairs:
+                    continue
+                key = (2, pair)
+            else:
+                continue
+            groups.setdefault(key, []).append(i)
+
+        # Sortierte Keys: erst Gewicht 1, dann 2, jeweils nach Qubit-Index/Paar
+        sorted_keys = sorted(groups.keys(), key=lambda k: (k[0], k[1]))
+
+        # Plot-Vorbereitung
+        fig, ax = plt.subplots(figsize=(14, 6))
+        bar_positions = []
+        bar_labels = []
+        bar_measured = []
+        bar_ideal = []
+        background_regions = []
+        separator_lines = []
+        current_index = 0
+
+        for color_index, key in enumerate(sorted_keys):
+            indices = groups[key]
+            color = block_colors[color_index % len(block_colors)]
+
+            # Sortiere innerhalb des Blocks alphabetisch nach Pauli-Kürzel
+            sorted_indices = sorted(
+                indices,
+                key=lambda i: pauli_key_string(model_terms[i])
+            )
+
+            background_regions.append((current_index, len(sorted_indices), color))
+
+            for idx in sorted_indices:
+                bar_positions.append(current_index)
+                bar_labels.append(compact_pauli_label(model_terms[idx]))
+                bar_measured.append(coeffs[idx])
+                current_index += 1
+
+            separator_lines.append(current_index - 0.5)
+
+        # Balken plotten
+        bar_positions = np.array(bar_positions)
+        ax.bar(bar_positions + 0.2, bar_measured, 0.4, color='tab:blue', label='Measured')
+        ax.bar(bar_positions - 0.2, bar_ideal, 0.4, color='tab:green', label='Ideal')
+        
+        from matplotlib.patches import Rectangle
+        
+        # Hintergrundfarben + Beschriftung oben
+        for start, length, color in background_regions:
+            ax.add_patch(Rectangle((start - 0.5, ax.get_ylim()[0]), length, ax.get_ylim()[1] - ax.get_ylim()[0],
+                                color=color, alpha=0.4, zorder=0))
+            key = sorted_keys[background_regions.index((start, length, color))]
+            label = f"Qu {key[1]}" if key[0] == 1 else f"Qu pair {key[1]}"
+            plt.text(start + length / 2 - 0.5, ax.get_ylim()[1] * 0.95, label,
+                    ha='center', va='top', fontsize=9, weight='bold', color='black')
+
+        # Schwarze Trennlinien zwischen Gruppen
+        for x in separator_lines[:-1]:
+            ax.axvline(x=x, color='black', linestyle='-', linewidth=1)
+
+        # Achsen & Formatierung
+        ax.set_xticks(bar_positions)
+        ax.set_xticklabels(bar_labels, rotation=90)
+        ax.set_title(title)
+        ax.set_xlabel("Support of model terms")
+        ax.set_ylabel(ylabel)
+        ax.legend()
+        plt.tight_layout()
+        plt.show()

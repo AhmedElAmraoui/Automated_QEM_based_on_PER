@@ -8,13 +8,14 @@ class ProcessorSpec:
     """Responsible for interacting with the processor interface to generate the Pauli bases
     and the model terms. Also stores the mapping of virtual to physical qubits for transpilation"""
 
-    def __init__(self, inst_map, processor):
+    def __init__(self, inst_map, processor, used_qubits):
         self._n = len(inst_map)
         self._processor = processor
         self.inst_map = inst_map
         self._connectivity = processor.sub_map(inst_map)
         self.meas_bases = self._meas_bases()
         self.model_terms = self._model_terms()
+        self.used_qubits = used_qubits
 
     def _meas_bases(self):
 
@@ -90,4 +91,7 @@ class ProcessorSpec:
 
 
     def transpile(self, circ, **kwargs):
-        return self._processor.transpile(circ, self.inst_map, **kwargs)
+        if self._processor.subgraph:
+            return self._processor.transpile(circ,used_qubits=self.used_qubits, **kwargs)
+        else:
+            return self._processor.transpile(circ, **kwargs)

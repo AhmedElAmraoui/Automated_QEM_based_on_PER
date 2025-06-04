@@ -23,13 +23,16 @@ class SparsePauliTomographyExperiment:
     instance for each distinct layer, running the analysis, and then returning a PERCircuit
     with NoiseModels attached to each distinct layer"""
 
-    def __init__(self, circuits, inst_map, backend):
+    def __init__(self, circuits, inst_map, backend, used_qubits):
 
         circuit_interface = None
-
+        subgraph = False
+        if len(used_qubits) != backend.num_qubits:
+            subgraph = True
+        
         if circuits[0].__class__.__name__ == "QuantumCircuit":
             circuit_interface = QiskitCircuit
-            processor = QiskitProcessor(backend)
+            processor = QiskitProcessor(backend, subgraph=subgraph)
         else:
             raise Exception("Unsupported circuit type")
     
@@ -45,10 +48,11 @@ class SparsePauliTomographyExperiment:
         for layer in self._profiles:
             logger.info(layer)
 
-        self._procspec = ProcessorSpec(inst_map, processor)
+        self._procspec = ProcessorSpec(inst_map, processor, used_qubits)
         self.instances = []
         self._inst_map = inst_map
         self._layers = None
+        self.used_qubits = used_qubits
 
         self._layers = []
         for l in self._profiles:
